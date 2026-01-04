@@ -5,12 +5,12 @@ An automated Research Agent server built with the [Model Context Protocol (MCP)]
 ## 🚀 Features
 
 *   automated Search: Query ArXiv for papers on any topic.
-*   ** Intelligent Extraction**: Uses NLP heuristics to extract the core "Problem", "Method", and "Result" from abstracts.
-*   **Data Science Pipeline**:
+*   Intelligent Extraction: Uses NLP heuristics to extract the core "Problem", "Method", and "Result" from abstracts.
+*   Data Science Pipeline:
     *   Saves findings to a structured dataset (`references.csv`).
-    *   **Visualize Trends**: Generate charts of dominating research methods (`analyze_references.py`).
-    *   **Topic Modeling**: Uses NMF (Non-Negative Matrix Factorization) to automatically discover hidden research themes (`topic_modeling.py`).
-*   **🕸️ Knowledge Graph**: Generates an interactive HTML network graph of author collaborations (`generate_network.py`).
+    *   Visualize Trends: Generate charts of dominating research methods (`analyze_references.py`).
+    *   Topic Modeling: Uses NMF (Non-Negative Matrix Factorization) to automatically discover hidden research themes (`topic_modeling.py`).
+*   Knowledge Graph: Generates an interactive HTML network graph of author collaborations (`generate_network.py`).
 
 ## Installation
 
