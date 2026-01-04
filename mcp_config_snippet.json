@@ -1,0 +1,13 @@
+{
+    "mcpServers": {
+        "research-assistant": {
+            "command": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3",
+            "args": [
+                "/Users/manaswi/Desktop/mcp project/research_server.py"
+            ],
+            "env": {
+                "PYTHONPATH": "/Users/manaswi/Desktop/mcp project"
+            }
+        }
+    }
+}
