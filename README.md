@@ -94,3 +94,5 @@ Run these scripts to generate insights from your collected `references.csv`:
 
 ---
 *Built with [mcp](https://pypi.org/project/mcp/), [arxiv](https://pypi.org/project/arxiv/), [pandas](https://pandas.pydata.org/), [scikit-learn](https://scikit-learn.org/), and [networkx](https://networkx.org/).*
+# arxiv-research-mcp
+# arxiv-research-mcp
