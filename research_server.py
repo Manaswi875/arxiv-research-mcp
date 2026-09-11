@@ -4,8 +4,12 @@ import json
 import os
 from typing import List, Dict, Any
 import arxiv
-import pandas as pd
 from mcp.server.fastmcp import FastMCP
+
+from paths import REFERENCES_CSV
+from analyze_references import analyze
+from generate_network import generate_graph
+from topic_modeling import run_topic_modeling
 
 # Initialize FastMCP server
 mcp = FastMCP("ArXiv Research Assistant")
@@ -22,25 +26,28 @@ def search_arxiv(query: str, max_results: int = 5) -> str:
     Returns:
         JSON string containing a list of papers with title, authors, published date, and abstract.
     """
-    client = arxiv.Client()
-    search = arxiv.Search(
-        query=query,
-        max_results=max_results,
-        sort_by=arxiv.SortCriterion.Relevance
-    )
-    
-    results = []
-    for result in client.results(search):
-        paper_info = {
-            "title": result.title,
-            "authors": [author.name for author in result.authors],
-            "published": result.published.strftime("%Y-%m-%d"),
-            "pdf_url": result.pdf_url,
-            "abstract": result.summary
-        }
-        results.append(paper_info)
-        
-    return json.dumps(results, indent=2)
+    try:
+        client = arxiv.Client()
+        search = arxiv.Search(
+            query=query,
+            max_results=max_results,
+            sort_by=arxiv.SortCriterion.Relevance
+        )
+
+        results = []
+        for result in client.results(search):
+            paper_info = {
+                "title": result.title,
+                "authors": [author.name for author in result.authors],
+                "published": result.published.strftime("%Y-%m-%d"),
+                "pdf_url": result.pdf_url,
+                "abstract": result.summary
+            }
+            results.append(paper_info)
+
+        return json.dumps(results, indent=2)
+    except Exception as e:
+        return json.dumps({"error": f"ArXiv search failed: {str(e)}"})
 
 @mcp.tool()
 def extract_key_findings(abstract: str) -> str:
@@ -122,21 +129,59 @@ def save_to_bibliography(paper_metadata: str) -> str:
     required_keys = ["title", "authors", "published", "pdf_url", "problem", "method", "result"]
     # Handle missing keys gracefully
     row = {k: str(data.get(k, "")) for k in required_keys}
-    
-    # CSV file path
-    file_path = "references.csv"
-    file_exists = os.path.isfile(file_path)
-    
+
+    file_exists = os.path.isfile(REFERENCES_CSV)
+
     try:
-        with open(file_path, mode='a', newline='', encoding='utf-8') as f:
+        with open(REFERENCES_CSV, mode='a', newline='', encoding='utf-8') as f:
             writer = csv.DictWriter(f, fieldnames=required_keys)
             if not file_exists:
                 writer.writeheader()
             writer.writerow(row)
-            
-        return f"Successfully added '{row['title']}' to {file_path}"
+
+        return f"Successfully added '{row['title']}' to {REFERENCES_CSV}"
     except Exception as e:
         return f"Error saving to bibliography: {str(e)}"
+
+@mcp.tool()
+def visualize_keyword_trends() -> str:
+    """
+    Analyze the local bibliography (references.csv) and generate a bar chart of the most
+    common keywords in the saved 'method' descriptions, plus the most common 'problem' keywords.
+
+    Returns:
+        JSON string with 'papers_analyzed', 'method_keywords', 'problem_keywords', and 'chart_path'
+        (path to the saved PNG), or an 'error' message if there's no bibliography yet.
+    """
+    return json.dumps(analyze(), indent=2)
+
+@mcp.tool()
+def generate_author_network() -> str:
+    """
+    Build an interactive co-authorship network graph from the local bibliography
+    (references.csv), saved as an HTML file.
+
+    Returns:
+        JSON string with 'num_authors', 'num_collaborations', and 'output_file' (path to the
+        saved HTML graph), or an 'error' message if there's no bibliography yet.
+    """
+    return json.dumps(generate_graph(), indent=2)
+
+@mcp.tool()
+def discover_research_topics(num_topics: int = 5) -> str:
+    """
+    Run NMF topic modeling over the local bibliography (references.csv) to automatically
+    discover hidden research themes, and save the per-paper topic assignments to
+    references_with_topics.csv.
+
+    Args:
+        num_topics: Number of topics to discover (default 5). Must be <= number of saved papers.
+
+    Returns:
+        JSON string with 'topic_summaries' (top keywords per topic), 'topic_distribution'
+        (paper count per topic), and 'output_file', or an 'error' message.
+    """
+    return json.dumps(run_topic_modeling(num_topics=num_topics), indent=2)
 
 if __name__ == "__main__":
     # Initialize and run the server

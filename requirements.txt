@@ -1,3 +1,8 @@
-mcp
+mcp<2
 arxiv
 pandas
+matplotlib
+networkx
+pyvis
+scikit-learn
+numpy

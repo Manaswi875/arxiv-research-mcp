@@ -4,13 +4,13 @@ An automated Research Agent server built with the [Model Context Protocol (MCP)]
 
 ## 🚀 Features
 
-*   automated Search: Query ArXiv for papers on any topic.
+*   Automated Search: Query ArXiv for papers on any topic.
 *   Intelligent Extraction: Uses NLP heuristics to extract the core "Problem", "Method", and "Result" from abstracts.
-*   Data Science Pipeline:
+*   Data Science Pipeline — all available as MCP tools, so an agent can trigger them directly:
     *   Saves findings to a structured dataset (`references.csv`).
-    *   Visualize Trends: Generate charts of dominating research methods (`analyze_references.py`).
-    *   Topic Modeling: Uses NMF (Non-Negative Matrix Factorization) to automatically discover hidden research themes (`topic_modeling.py`).
-*   Knowledge Graph: Generates an interactive HTML network graph of author collaborations (`generate_network.py`).
+    *   Visualize Trends: Generate charts of dominating research methods (`visualize_keyword_trends` tool / `analyze_references.py`).
+    *   Topic Modeling: Uses NMF (Non-Negative Matrix Factorization) to automatically discover hidden research themes (`discover_research_topics` tool / `topic_modeling.py`).
+    *   Knowledge Graph: Generates an interactive HTML network graph of author collaborations (`generate_author_network` tool / `generate_network.py`).
 
 ## Installation
 
@@ -21,7 +21,7 @@ An automated Research Agent server built with the [Model Context Protocol (MCP)]
 1.  **Clone the repository**:
     ```bash
     git clone <your-repo-url>
-    cd mcp-project
+    cd arxiv-research-mcp
     ```
 
 2.  **Create a Virtual Environment**:
@@ -43,56 +43,55 @@ Add the server to your IDE's MCP settings (e.g., `mcp-servers.json` in VS Code o
 {
   "mcpServers": {
     "research-assistant": {
-      "command": "/absolute/path/to/your/mcp-project/.venv/bin/python",
+      "command": "/absolute/path/to/your/arxiv-research-mcp/.venv/bin/python",
       "args": [
-        "/absolute/path/to/your/mcp-project/research_server.py"
+        "/absolute/path/to/your/arxiv-research-mcp/research_server.py"
       ],
       "env": {
-        "PYTHONPATH": "/absolute/path/to/your/mcp-project"
+        "PYTHONPATH": "/absolute/path/to/your/arxiv-research-mcp"
       }
     }
   }
 }
 ```
-*Note: Replace `/absolute/path/to/your/mcp-project/` with the actual full path on your machine.*
+*Note: Replace `/absolute/path/to/your/arxiv-research-mcp/` with the actual full path on your machine.*
 
 ## 💡 Usage
 
-### 1. The MCP Agent
-Once configured, you can ask your AI Assistant commands like:
+Everything below is available as an MCP tool an agent can call directly — no separate terminal step needed. Just ask your AI Assistant things like:
+
 > "Find 5 papers on 'Reinforcement Learning from Human Feedback', extract their key findings, and save them to my bibliography."
 
-### 2. Analysis Tools
-Run these scripts to generate insights from your collected `references.csv`:
+> "Now visualize the keyword trends in my bibliography and tell me the dominant research topics."
 
-*   **Visualize Keyword Trends**:
-    ```bash
-    python analyze_references.py
-    ```
-    *Generates `method_keywords.png`.*
+### MCP Tools
 
-*   **View Author Network**:
-    ```bash
-    python generate_network.py
-    ```
-    *Generates `author_network.html` (interactive).*
+*   **`search_arxiv(query, max_results)`** — Search ArXiv for papers.
+*   **`extract_key_findings(abstract)`** — Heuristically extract Problem/Method/Result from an abstract.
+*   **`save_to_bibliography(paper_metadata)`** — Append a paper (with its findings) to `references.csv`.
+*   **`visualize_keyword_trends()`** — Generate a bar chart of common method keywords; saves `method_keywords.png`.
+*   **`generate_author_network()`** — Build an interactive co-authorship graph; saves `author_network.html`.
+*   **`discover_research_topics(num_topics)`** — Run NMF topic modeling over the bibliography; saves `references_with_topics.csv`.
 
-*   **Discover Hidden Topics**:
-    ```bash
-    python topic_modeling.py
-    ```
-    *Generates `references_with_topics.csv` with ML-assigned topic clusters.*
+### Running the analysis scripts standalone
+
+Each analysis tool is also a runnable CLI script, if you'd rather generate insights from the terminal directly:
+
+```bash
+python analyze_references.py     # -> method_keywords.png
+python generate_network.py       # -> author_network.html
+python topic_modeling.py         # -> references_with_topics.csv
+```
 
 ## 📂 Project Structure
 
-- `research_server.py`: The core MCP server logic.
-- `analyze_references.py`: Visualization script for keyword frequencies.
-- `generate_network.py`: NetworkX/Pyvis script for knowledge graphs.
-- `topic_modeling.py`: Scikit-learn script for NMF topic modeling.
+- `research_server.py`: The core MCP server — exposes all tools listed above.
+- `paths.py`: Shared file paths, anchored to the project directory (not the caller's working directory).
+- `analyze_references.py`: Keyword-frequency visualization (also the `visualize_keyword_trends` tool).
+- `generate_network.py`: NetworkX/Pyvis co-authorship graph (also the `generate_author_network` tool).
+- `topic_modeling.py`: Scikit-learn NMF topic modeling (also the `discover_research_topics` tool).
 - `references.csv`: The dataset built by the agent.
 - `requirements.txt`: Python dependencies.
 
 ---
 *Built with [mcp](https://pypi.org/project/mcp/), [arxiv](https://pypi.org/project/arxiv/), [pandas](https://pandas.pydata.org/), [scikit-learn](https://scikit-learn.org/), and [networkx](https://networkx.org/).*
-# arxiv-research-mcp
-# arxiv-research-mcp

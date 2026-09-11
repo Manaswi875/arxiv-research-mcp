@@ -1,12 +1,12 @@
 {
     "mcpServers": {
         "research-assistant": {
-            "command": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3",
+            "command": "/absolute/path/to/arxiv-research-mcp/.venv/bin/python",
             "args": [
-                "/Users/manaswi/Desktop/mcp project/research_server.py"
+                "/absolute/path/to/arxiv-research-mcp/research_server.py"
             ],
             "env": {
-                "PYTHONPATH": "/Users/manaswi/Desktop/mcp project"
+                "PYTHONPATH": "/absolute/path/to/arxiv-research-mcp"
             }
         }
     }

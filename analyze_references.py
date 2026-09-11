@@ -1,20 +1,23 @@
-import pandas as pd
-import matplotlib.pyplot as plt
-from collections import Counter
-import re
 import os
+import re
+from collections import Counter
 
-def analyze():
-    print("Loading references.csv...")
-    try:
-        df = pd.read_csv("references.csv")
-    except FileNotFoundError:
-        print("references.csv not found.")
-        return
+import matplotlib
+matplotlib.use("Agg")  # non-interactive backend; required when imported into a long-running MCP server
+import matplotlib.pyplot as plt
+import pandas as pd
 
-    print(f"Loaded {len(df)} papers.")
-    
-    # Keyword Analysis
+from paths import REFERENCES_CSV, METHOD_KEYWORDS_PNG
+
+
+def analyze() -> dict:
+    if not os.path.isfile(REFERENCES_CSV):
+        return {"error": f"{REFERENCES_CSV} not found. Save some papers first with save_to_bibliography."}
+
+    df = pd.read_csv(REFERENCES_CSV)
+    if df.empty:
+        return {"error": "references.csv is empty. Save some papers first."}
+
     def get_common_words(text_series, top_n=8):
         text = " ".join(text_series.dropna().astype(str).tolist())
         words = re.findall(r'\w+', text.lower())
@@ -25,24 +28,38 @@ def analyze():
     method_keywords = get_common_words(df['method']) if 'method' in df.columns else []
     problem_keywords = get_common_words(df['problem']) if 'problem' in df.columns else []
 
-    # Visualization
+    chart_path = None
     if method_keywords:
         words, counts = zip(*method_keywords)
-        
+
         plt.figure(figsize=(10, 6))
         plt.bar(words, counts, color='skyblue')
-        plt.title('Top Method Keyswords in Bibliography')
+        plt.title('Top Method Keywords in Bibliography')
         plt.xlabel('Keyword')
         plt.ylabel('Frequency')
         plt.xticks(rotation=45)
         plt.tight_layout()
-        
-        output_file = "method_keywords.png"
-        plt.savefig(output_file)
-        print(f"\n✅ Created chart: {os.path.abspath(output_file)}")
-    
-    if problem_keywords:
-        print("\nTop Problem Keywords:", problem_keywords)
+
+        plt.savefig(METHOD_KEYWORDS_PNG)
+        plt.close()
+        chart_path = METHOD_KEYWORDS_PNG
+
+    return {
+        "papers_analyzed": len(df),
+        "method_keywords": method_keywords,
+        "problem_keywords": problem_keywords,
+        "chart_path": chart_path,
+    }
+
 
 if __name__ == "__main__":
-    analyze()
+    print("Loading references.csv...")
+    result = analyze()
+    if "error" in result:
+        print(result["error"])
+    else:
+        print(f"Loaded {result['papers_analyzed']} papers.")
+        if result["chart_path"]:
+            print(f"\n✅ Created chart: {os.path.abspath(result['chart_path'])}")
+        if result["problem_keywords"]:
+            print("\nTop Problem Keywords:", result["problem_keywords"])
