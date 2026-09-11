@@ -1,4 +1,4 @@
-import os
+import io
 import re
 from collections import Counter
 
@@ -7,16 +7,15 @@ matplotlib.use("Agg")  # non-interactive backend; required when imported into a 
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from paths import REFERENCES_CSV, METHOD_KEYWORDS_PNG
+import db
 
 
 def analyze() -> dict:
-    if not os.path.isfile(REFERENCES_CSV):
-        return {"error": f"{REFERENCES_CSV} not found. Save some papers first with save_to_bibliography."}
+    rows = db.fetch_all_papers()
+    if not rows:
+        return {"error": "The bibliography is empty. Save some papers first with save_to_bibliography."}
 
-    df = pd.read_csv(REFERENCES_CSV)
-    if df.empty:
-        return {"error": "references.csv is empty. Save some papers first."}
+    df = pd.DataFrame(rows)
 
     def get_common_words(text_series, top_n=8):
         text = " ".join(text_series.dropna().astype(str).tolist())
@@ -28,7 +27,7 @@ def analyze() -> dict:
     method_keywords = get_common_words(df['method']) if 'method' in df.columns else []
     problem_keywords = get_common_words(df['problem']) if 'problem' in df.columns else []
 
-    chart_path = None
+    chart_png = None
     if method_keywords:
         words, counts = zip(*method_keywords)
 
@@ -40,26 +39,29 @@ def analyze() -> dict:
         plt.xticks(rotation=45)
         plt.tight_layout()
 
-        plt.savefig(METHOD_KEYWORDS_PNG)
+        buf = io.BytesIO()
+        plt.savefig(buf, format="png")
         plt.close()
-        chart_path = METHOD_KEYWORDS_PNG
+        chart_png = buf.getvalue()
 
     return {
         "papers_analyzed": len(df),
         "method_keywords": method_keywords,
         "problem_keywords": problem_keywords,
-        "chart_path": chart_path,
+        "chart_png": chart_png,
     }
 
 
 if __name__ == "__main__":
-    print("Loading references.csv...")
+    print("Loading bibliography...")
     result = analyze()
     if "error" in result:
         print(result["error"])
     else:
         print(f"Loaded {result['papers_analyzed']} papers.")
-        if result["chart_path"]:
-            print(f"\n✅ Created chart: {os.path.abspath(result['chart_path'])}")
+        if result["chart_png"]:
+            with open("method_keywords.png", "wb") as f:
+                f.write(result["chart_png"])
+            print("\n✅ Created chart: method_keywords.png")
         if result["problem_keywords"]:
             print("\nTop Problem Keywords:", result["problem_keywords"])

@@ -1,20 +1,17 @@
-import os
-
 import numpy as np
 import pandas as pd
 from sklearn.decomposition import NMF
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-from paths import REFERENCES_CSV, REFERENCES_WITH_TOPICS_CSV
+import db
 
 
 def run_topic_modeling(num_topics: int = 5) -> dict:
-    if not os.path.isfile(REFERENCES_CSV):
-        return {"error": f"{REFERENCES_CSV} not found. Save some papers first with save_to_bibliography."}
+    rows = db.fetch_all_papers()
+    if not rows:
+        return {"error": "The bibliography is empty. Save some papers first with save_to_bibliography."}
 
-    df = pd.read_csv(REFERENCES_CSV)
-    if df.empty:
-        return {"error": "references.csv is empty. Save some papers first."}
+    df = pd.DataFrame(rows)
 
     if len(df) < num_topics:
         return {"error": f"Need at least {num_topics} papers to discover {num_topics} topics; only have {len(df)}. Save more papers or lower num_topics."}
@@ -53,27 +50,26 @@ def run_topic_modeling(num_topics: int = 5) -> dict:
         # Get top 10 words for this topic
         top_indices = topic.argsort()[:-11:-1]
         top_words = [feature_names[i] for i in top_indices]
-        topic_summaries[topic_idx] = ", ".join(top_words)
+        topic_summaries[str(topic_idx)] = ", ".join(top_words)
 
-    # 5. Assign Dominant Topic to Papers
+    # 5. Assign Dominant Topic to Papers, and persist it back to the database
     dominant_topic_indices = np.argmax(nmf_features, axis=1)
 
     df['Topic_ID'] = dominant_topic_indices
-    df['Topic_Keywords'] = df['Topic_ID'].map(topic_summaries)
+    df['Topic_Keywords'] = df['Topic_ID'].map(lambda i: topic_summaries[str(i)])
 
-    # Save results
-    df.to_csv(REFERENCES_WITH_TOPICS_CSV, index=False)
+    for _, row in df.iterrows():
+        db.update_topics(row['id'], int(row['Topic_ID']), row['Topic_Keywords'], None)
 
     return {
         "papers_analyzed": len(df),
-        "topic_summaries": {str(k): v for k, v in topic_summaries.items()},
+        "topic_summaries": topic_summaries,
         "topic_distribution": df['Topic_Keywords'].value_counts().to_dict(),
-        "output_file": REFERENCES_WITH_TOPICS_CSV,
     }
 
 
 if __name__ == "__main__":
-    print("Loading references.csv...")
+    print("Loading bibliography...")
     result = run_topic_modeling()
     if "error" in result:
         print(result["error"])
@@ -82,8 +78,7 @@ if __name__ == "__main__":
         print("\n=== Discovered Research Topics ===")
         for topic_idx, summary in result["topic_summaries"].items():
             print(f"Topic {int(topic_idx) + 1}: {summary}")
-        print(f"\n✅ Analysis Complete!")
-        print(f"   Saved detailed results to: {os.path.abspath(result['output_file'])}")
+        print("\n✅ Analysis complete! Topic assignments saved to the database.")
         print("\n--- Topic Distribution ---")
         for keywords, count in result["topic_distribution"].items():
             print(f"{keywords}    {count}")

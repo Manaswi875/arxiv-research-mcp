@@ -6,3 +6,5 @@ networkx
 pyvis
 scikit-learn
 numpy
+anthropic
+psycopg[binary]

@@ -8,6 +8,10 @@ __pycache__/
 venv/
 env/
 
+# Secrets
+.env
+.env.local
+
 # Data (Generated)
 references.csv
 references_with_topics.csv
