@@ -8,6 +8,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 import db
+from chart_style import ACCENT, apply_style
+
+apply_style()
 
 
 def analyze() -> dict:
@@ -32,8 +35,11 @@ def analyze() -> dict:
         words, counts = zip(*method_keywords)
 
         plt.figure(figsize=(10, 6))
-        plt.bar(words, counts, color='skyblue')
-        plt.title('Top Method Keywords in Bibliography')
+        bars = plt.bar(words, counts, color=ACCENT, width=0.6)
+        for bar, count in zip(bars, counts):
+            plt.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.05,
+                      str(count), ha="center", va="bottom", fontsize=9, color="#52514e")
+        plt.title('Top Method Keywords in Bibliography', fontsize=13, fontweight="bold")
         plt.xlabel('Keyword')
         plt.ylabel('Frequency')
         plt.xticks(rotation=45)

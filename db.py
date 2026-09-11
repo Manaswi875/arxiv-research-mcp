@@ -84,6 +84,35 @@ def fetch_all_papers() -> list[dict]:
         return cur.fetchall()
 
 
+def get_paper(paper_id: int) -> dict | None:
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute("SELECT * FROM papers WHERE id = %s;", (paper_id,))
+        return cur.fetchone()
+
+
+def update_paper(paper_id: int, data: dict) -> None:
+    """Full update of the 6 editable fields. `authors` must be a plain list -
+    wrapped in Jsonb here, same trap as upsert_paper (a bare list misadapts to
+    a Postgres array literal, not JSON)."""
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE papers SET title = %s, authors = %s, published = %s,
+                problem = %s, method = %s, result = %s
+            WHERE id = %s;
+            """,
+            (
+                data["title"], Jsonb(data["authors"]), data["published"],
+                data["problem"], data["method"], data["result"], paper_id,
+            ),
+        )
+
+
+def delete_paper(paper_id: int) -> None:
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute("DELETE FROM papers WHERE id = %s;", (paper_id,))
+
+
 def update_topics(paper_id: int, topic_id: int, topic_keywords: str, topic_label: str | None) -> None:
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute(
@@ -102,7 +131,15 @@ def update_topic_labels_bulk(labels: dict[int, str]) -> None:
             )
 
 
+def rename_topic(topic_id: int, label: str) -> None:
+    """Renaming a topic is just re-applying a label to every paper sharing that
+    topic_id - no new SQL needed beyond the existing bulk-label updater."""
+    update_topic_labels_bulk({topic_id: label})
+
+
 def save_literature_review(content: str, paper_count: int) -> None:
+    """Called on a fresh LLM-generated review - always clears the 'edited' flag,
+    since a regenerate always overwrites any manual edits from before."""
     oauth_set(
         "literature_review",
         "latest",
@@ -110,6 +147,25 @@ def save_literature_review(content: str, paper_count: int) -> None:
             "content": content,
             "paper_count": paper_count,
             "generated_at": datetime.now(timezone.utc).isoformat(),
+            "edited": False,
+            "edited_at": None,
+        },
+    )
+
+
+def update_literature_review_content(content: str) -> None:
+    """Called on a manual dashboard/tool edit - keeps generated_at/paper_count
+    from the last real generation (or None/0 if none has ever run), marks edited=True."""
+    existing = get_latest_literature_review() or {"paper_count": len(fetch_all_papers()), "generated_at": None}
+    oauth_set(
+        "literature_review",
+        "latest",
+        {
+            "content": content,
+            "paper_count": existing.get("paper_count", 0),
+            "generated_at": existing.get("generated_at"),
+            "edited": True,
+            "edited_at": datetime.now(timezone.utc).isoformat(),
         },
     )
 

@@ -1,4 +1,3 @@
-import base64
 import json
 import os
 import re
@@ -15,7 +14,6 @@ from starlette.responses import Response
 import dashboard
 import db
 from analyze_references import analyze
-from generate_network import generate_graph
 from llm import extract_findings_llm, label_topics
 from llm import generate_literature_review as generate_literature_review_llm
 from oauth_provider import MCP_SCOPE, SimpleOAuthProvider
@@ -248,22 +246,6 @@ def visualize_research_trends() -> list:
         blocks.append(Image(data=png_bytes, format="png"))
     return blocks
 
-@mcp.tool()
-def generate_author_network() -> str:
-    """
-    Build an interactive co-authorship network graph from the bibliography.
-
-    Returns:
-        JSON string with 'num_authors', 'num_collaborations', and 'html_base64' (the interactive
-        graph as a base64-encoded, self-contained HTML file - decode and save it to view it), or
-        an 'error' message if there's no bibliography yet.
-    """
-    result = generate_graph()
-    html = result.pop("html", None)
-    if html:
-        result["html_base64"] = base64.b64encode(html.encode("utf-8")).decode("ascii")
-    return json.dumps(result, indent=2)
-
 def _recompute_topics(num_topics: int = 5) -> dict:
     """Shared by the discover_research_topics tool and the dashboard's "Recompute
     Topics" button - one code path, so the two surfaces can never drift apart."""
@@ -316,6 +298,93 @@ def generate_literature_review() -> str:
         return _generate_and_save_review()
     except Exception as e:
         return json.dumps({"error": f"Literature review generation failed: {str(e)}"})
+
+@mcp.tool()
+def update_paper(
+    paper_id: int,
+    title: str | None = None,
+    authors: list[str] | None = None,
+    published: str | None = None,
+    problem: str | None = None,
+    method: str | None = None,
+    result: str | None = None,
+) -> str:
+    """
+    Update one or more fields of a saved paper by id. Any field left as None is left
+    unchanged. authors, if given, fully replaces the author list. published, if given,
+    is an ISO date string (YYYY-MM-DD).
+
+    Returns:
+        A success message, or a JSON string with an 'error' message.
+    """
+    existing = db.get_paper(paper_id)
+    if not existing:
+        return json.dumps({"error": f"No paper with id {paper_id}."})
+
+    merged = {
+        "title": title if title is not None else existing["title"],
+        "authors": authors if authors is not None else existing["authors"],
+        "published": existing["published"],
+        "problem": problem if problem is not None else existing["problem"],
+        "method": method if method is not None else existing["method"],
+        "result": result if result is not None else existing["result"],
+    }
+    if published is not None:
+        try:
+            merged["published"] = date.fromisoformat(published)
+        except ValueError:
+            return json.dumps({"error": f"Invalid published date '{published}', expected YYYY-MM-DD."})
+
+    try:
+        db.update_paper(paper_id, merged)
+        return f"Successfully updated paper {paper_id}."
+    except Exception as e:
+        return json.dumps({"error": f"Update failed: {str(e)}"})
+
+@mcp.tool()
+def delete_paper(paper_id: int) -> str:
+    """
+    Permanently delete a paper from the bibliography by id.
+
+    Returns:
+        A success message, or a JSON string with an 'error' message.
+    """
+    try:
+        db.delete_paper(paper_id)
+        return f"Successfully deleted paper {paper_id}."
+    except Exception as e:
+        return json.dumps({"error": f"Delete failed: {str(e)}"})
+
+@mcp.tool()
+def rename_topic(topic_id: int, label: str) -> str:
+    """
+    Rename a discovered topic's label - applies to every paper currently assigned that
+    topic_id, without needing to recompute topics.
+
+    Returns:
+        A success message, or a JSON string with an 'error' message.
+    """
+    try:
+        db.rename_topic(topic_id, label)
+        return f"Successfully renamed topic {topic_id} to '{label}'."
+    except Exception as e:
+        return json.dumps({"error": f"Rename failed: {str(e)}"})
+
+@mcp.tool()
+def update_literature_review(content: str) -> str:
+    """
+    Manually overwrite the saved literature review's text without regenerating it.
+    Marks it as manually edited, so the dashboard shows a warning before a future
+    regenerate discards it.
+
+    Returns:
+        A success message, or a JSON string with an 'error' message.
+    """
+    try:
+        db.update_literature_review_content(content)
+        return "Successfully saved literature review edits."
+    except Exception as e:
+        return json.dumps({"error": f"Save failed: {str(e)}"})
 
 dashboard.register_dashboard_routes(mcp, generate_review_fn=_generate_and_save_review, recompute_topics_fn=_recompute_topics)
 
