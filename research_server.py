@@ -5,37 +5,64 @@ import re
 from datetime import date
 
 import arxiv
-from mcp.server.auth.settings import AuthSettings
+from mcp.server.auth.settings import AuthSettings, ClientRegistrationOptions
 from mcp.server.fastmcp import FastMCP, Image
 from mcp.server.transport_security import TransportSecuritySettings
+from starlette.exceptions import HTTPException
+from starlette.requests import Request
+from starlette.responses import Response
 
 import db
 from analyze_references import analyze
-from auth import StaticTokenVerifier
 from generate_network import generate_graph
 from llm import extract_findings_llm, label_topics
+from oauth_provider import MCP_SCOPE, SimpleOAuthProvider
 from topic_modeling import run_topic_modeling
 
 # Initialize FastMCP server.
 # stateless_http is always on - correct for both stdio (inert there) and a
 # serverless HTTP deployment (no session affinity can be assumed across
-# invocations). Auth is wired only when MCP_AUTH_TOKEN is set, so local dev
-# needs no new env vars.
+# invocations). OAuth (dynamic client registration + a login form gated by
+# MCP_AUTH_TOKEN) is wired only when MCP_SERVER_URL is set, so local stdio
+# dev needs no new env vars. A plain static bearer token doesn't work here:
+# Claude.ai's "Add custom connector" flow only speaks full OAuth for
+# connectors that declare auth, so the provider below implements a minimal
+# single-user authorization server instead (see oauth_provider.py).
 #
 # MCP's built-in DNS-rebinding protection (transport_security) only allows
 # Host/Origin headers matching a fixed allowlist, which defeats a real
 # public deployment (Vercel's hostname, plus a different one per preview
-# deploy). Disabled only when hosted - the bearer token above is the real
+# deploy). Disabled only when hosted - the OAuth login above is the real
 # access control here, not this browser-focused protection meant for
 # locally-running dev servers.
-_auth_token = os.environ.get("MCP_AUTH_TOKEN")
+_server_url = os.environ.get("MCP_SERVER_URL")
+_oauth_provider = SimpleOAuthProvider(auth_callback_url=f"{_server_url}/login", server_url=_server_url) if _server_url else None
 mcp = FastMCP(
     "ArXiv Research Assistant",
     stateless_http=True,
-    token_verifier=StaticTokenVerifier() if _auth_token else None,
-    auth=AuthSettings(issuer_url="https://arxiv-research-mcp.invalid", resource_server_url=None) if _auth_token else None,
-    transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False) if _auth_token else None,
+    auth_server_provider=_oauth_provider,
+    auth=AuthSettings(
+        issuer_url=_server_url,
+        client_registration_options=ClientRegistrationOptions(
+            enabled=True, valid_scopes=[MCP_SCOPE], default_scopes=[MCP_SCOPE]
+        ),
+        required_scopes=[MCP_SCOPE],
+        resource_server_url=None,
+    ) if _server_url else None,
+    transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False) if _server_url else None,
 )
+
+if _oauth_provider:
+    @mcp.custom_route("/login", methods=["GET"])
+    async def login_page_handler(request: Request) -> Response:
+        state = request.query_params.get("state")
+        if not state:
+            raise HTTPException(400, "Missing state parameter")
+        return await _oauth_provider.get_login_page(state)
+
+    @mcp.custom_route("/login/callback", methods=["POST"])
+    async def login_callback_handler(request: Request) -> Response:
+        return await _oauth_provider.handle_login_callback(request)
 
 @mcp.tool()
 def search_arxiv(query: str, max_results: int = 5) -> str:

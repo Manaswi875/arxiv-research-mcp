@@ -19,6 +19,18 @@ CREATE TABLE IF NOT EXISTS papers (
     topic_label TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Generic key-value store for OAuth state (registered clients, in-flight
+-- authorize state, issued codes/tokens). Needs to be a real table, not an
+-- in-memory dict, since a serverless invocation can't assume any previous
+-- state survived in process memory.
+CREATE TABLE IF NOT EXISTS oauth_store (
+    kind TEXT NOT NULL,
+    key TEXT NOT NULL,
+    value JSONB NOT NULL,
+    expires_at TIMESTAMPTZ,
+    PRIMARY KEY (kind, key)
+);
 """
 
 UPSERT_SQL = """
@@ -77,6 +89,43 @@ def update_topics(paper_id: int, topic_id: int, topic_keywords: str, topic_label
             "UPDATE papers SET topic_id = %s, topic_keywords = %s, topic_label = %s WHERE id = %s;",
             (topic_id, topic_keywords, topic_label, paper_id),
         )
+
+
+def oauth_set(kind: str, key: str, value: dict, ttl_seconds: int | None = None) -> None:
+    with get_connection() as conn, conn.cursor() as cur:
+        if ttl_seconds is not None:
+            cur.execute(
+                """
+                INSERT INTO oauth_store (kind, key, value, expires_at)
+                VALUES (%s, %s, %s, now() + (%s * interval '1 second'))
+                ON CONFLICT (kind, key) DO UPDATE SET value = EXCLUDED.value, expires_at = EXCLUDED.expires_at;
+                """,
+                (kind, key, Jsonb(value), ttl_seconds),
+            )
+        else:
+            cur.execute(
+                """
+                INSERT INTO oauth_store (kind, key, value, expires_at)
+                VALUES (%s, %s, %s, NULL)
+                ON CONFLICT (kind, key) DO UPDATE SET value = EXCLUDED.value, expires_at = NULL;
+                """,
+                (kind, key, Jsonb(value)),
+            )
+
+
+def oauth_get(kind: str, key: str) -> dict | None:
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT value FROM oauth_store WHERE kind = %s AND key = %s AND (expires_at IS NULL OR expires_at > now());",
+            (kind, key),
+        )
+        row = cur.fetchone()
+        return row["value"] if row else None
+
+
+def oauth_delete(kind: str, key: str) -> None:
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute("DELETE FROM oauth_store WHERE kind = %s AND key = %s;", (kind, key))
 
 
 if __name__ == "__main__":

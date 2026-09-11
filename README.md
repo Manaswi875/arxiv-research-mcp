@@ -69,14 +69,19 @@ Add the server to your IDE's MCP settings (e.g., `mcp-servers.json` in VS Code o
 
 ## ☁️ Configuration — Remote (hosted on Vercel)
 
-This same server can run as a remote MCP endpoint instead of a process your IDE launches:
+This same server can run as a remote MCP endpoint instead of a process your IDE launches. It authenticates over OAuth rather than a static bearer token — clients like Claude.ai's "Add custom connector" only speak full OAuth for connectors that declare auth, so this server implements a minimal single-user authorization server (dynamic client registration + a login form) rather than expecting the client to accept a pasted token directly.
 
 1. Deploy this repo to Vercel (it auto-detects the Python entrypoint `index.py`).
-2. Set `DATABASE_URL`, `ANTHROPIC_API_KEY`, and `MCP_AUTH_TOKEN` as Vercel environment variables. Generate the auth token once with:
-   ```bash
-   python -c "import secrets; print(secrets.token_urlsafe(32))"
-   ```
-3. Point a remote-MCP-capable client at `https://<your-project>.vercel.app/mcp`, sending `Authorization: Bearer <MCP_AUTH_TOKEN>` on every request. **Without `MCP_AUTH_TOKEN` set, the deployed endpoint is wide open — anyone with the URL could call your tools and spend your Anthropic budget.** Setting it is what enables the auth check; there is no separate on/off switch.
+2. Set these Vercel environment variables:
+   - `DATABASE_URL`, `ANTHROPIC_API_KEY` (same as local)
+   - `MCP_SERVER_URL` — the public URL this deployment is reachable at, e.g. `https://<your-project>.vercel.app`
+   - `MCP_AUTH_TOKEN` — the password you'll type into the login form during setup (not something you paste into the client). Generate one with:
+     ```bash
+     python -c "import secrets; print(secrets.token_urlsafe(32))"
+     ```
+3. In your MCP client (e.g. Claude.ai → Settings → Connectors → Add custom connector), enter the server URL as `https://<your-project>.vercel.app/mcp`. The client will register itself and redirect you to a login page hosted by this server — enter the `MCP_AUTH_TOKEN` there to authorize it.
+
+**OAuth (and with it, the login gate) only activates when `MCP_SERVER_URL` is set.** Leaving it unset — the local-dev default — means the deployed endpoint would be wide open, letting anyone who finds the URL call your tools and spend your Anthropic budget. Set both `MCP_SERVER_URL` and `MCP_AUTH_TOKEN` together for a real hosted deployment.
 
 ## 💡 Usage
 
