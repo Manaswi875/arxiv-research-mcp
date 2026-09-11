@@ -7,6 +7,7 @@ from datetime import date
 import arxiv
 from mcp.server.auth.settings import AuthSettings
 from mcp.server.fastmcp import FastMCP, Image
+from mcp.server.transport_security import TransportSecuritySettings
 
 import db
 from analyze_references import analyze
@@ -20,12 +21,20 @@ from topic_modeling import run_topic_modeling
 # serverless HTTP deployment (no session affinity can be assumed across
 # invocations). Auth is wired only when MCP_AUTH_TOKEN is set, so local dev
 # needs no new env vars.
+#
+# MCP's built-in DNS-rebinding protection (transport_security) only allows
+# Host/Origin headers matching a fixed allowlist, which defeats a real
+# public deployment (Vercel's hostname, plus a different one per preview
+# deploy). Disabled only when hosted - the bearer token above is the real
+# access control here, not this browser-focused protection meant for
+# locally-running dev servers.
 _auth_token = os.environ.get("MCP_AUTH_TOKEN")
 mcp = FastMCP(
     "ArXiv Research Assistant",
     stateless_http=True,
     token_verifier=StaticTokenVerifier() if _auth_token else None,
     auth=AuthSettings(issuer_url="https://arxiv-research-mcp.invalid", resource_server_url=None) if _auth_token else None,
+    transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False) if _auth_token else None,
 )
 
 @mcp.tool()
