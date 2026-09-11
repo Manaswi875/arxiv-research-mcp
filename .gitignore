@@ -12,15 +12,17 @@ env/
 .env
 .env.local
 
-# Data (Generated)
-references.csv
-references_with_topics.csv
+# Data (Generated - only produced by the standalone `python xyz.py` CLI usage,
+# never by the MCP tools, which read/write Postgres and keep everything in memory)
+/references.csv
+/references_with_topics.csv
 
-# Artifacts (Generated)
-*.png
-*.html
-*.pdf
-lib/
+# Artifacts (Generated, anchored to root - a repo-wide *.html/*.png glob would
+# silently swallow real source files, e.g. dashboard templates)
+/method_keywords.png
+/author_network.html
+/research_trends.png
+/lib/
 
 # IDE settings
 .vscode/

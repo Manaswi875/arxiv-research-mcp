@@ -1,6 +1,6 @@
 # 🎓 ArXiv Research Assistant (MCP Server)
 
-A Research Agent server built with the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/). Search ArXiv, extract structured findings from papers, build a bibliography, and discover insights (keyword trends, author networks, topic clusters) — all as tools an AI assistant can call directly. Runs either as a local server launched by your IDE, or hosted remotely.
+A Research Agent server built with the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/). Search ArXiv, extract structured findings from papers, build a bibliography, and discover insights (keyword trends, author networks, topic clusters, a trend timeline, an AI-written literature review) — all as tools an AI assistant can call directly, plus a real web dashboard to see it all. Runs either as a local server launched by your IDE, or hosted remotely.
 
 ## 🚀 Features
 
@@ -9,8 +9,11 @@ A Research Agent server built with the [Model Context Protocol (MCP)](https://mo
 *   Bibliography: saved to a Postgres database (dedupes automatically by paper URL).
 *   Data Science Pipeline — all available as MCP tools, so an agent can trigger them directly:
     *   Visualize Trends: bar chart of dominant research methods.
+    *   Research Timeline: stacked bar chart of how your saved papers' topics have shifted year over year.
     *   Topic Modeling: NMF (Non-Negative Matrix Factorization) discovers hidden research themes, then a single Claude Haiku call turns the raw keyword clusters into short readable labels.
     *   Knowledge Graph: interactive HTML network graph of author collaborations.
+    *   Literature Review: one Claude Haiku call synthesizes the whole bibliography into a cohesive, numbered-citation narrative review.
+*   Web Dashboard: a real homepage (at the deployed root URL) showing the bibliography, topic clusters, both charts, the interactive author network, and the generated literature review — gated behind a login page, not open to the whole internet.
 
 ## Installation
 
@@ -98,8 +101,14 @@ Everything below is available as an MCP tool an agent can call directly — no s
 *   **`extract_key_findings_llm(abstract)`** — Same extraction via Claude Haiku 4.5 — more accurate, small API cost.
 *   **`save_to_bibliography(paper_metadata)`** — Upsert a paper (with its findings) into the database, keyed by its PDF URL.
 *   **`visualize_keyword_trends()`** — Bar chart of common method keywords, returned as an inline image.
+*   **`visualize_research_trends()`** — Stacked bar chart of papers per topic per year, returned as an inline image.
 *   **`generate_author_network()`** — Interactive co-authorship graph, returned as a base64-encoded self-contained HTML file (decode and open it to view).
 *   **`discover_research_topics(num_topics)`** — NMF topic modeling over the bibliography, plus Claude-generated readable labels for each topic.
+*   **`generate_literature_review()`** — Synthesizes the whole bibliography into one narrative review with numbered `[n]` citations, via a single Claude Haiku call.
+
+### Web Dashboard
+
+Once deployed (or run locally), visit the server's root URL in a browser — it's gated behind a login form using the same `MCP_AUTH_TOKEN` as the OAuth setup. The dashboard shows the bibliography table, topic cluster breakdown, both charts, the interactive author network (embedded live, not a static image), and the cached literature review, with buttons to recompute topics or regenerate the review on demand.
 
 ### Running the analysis scripts standalone
 
@@ -115,10 +124,12 @@ python topic_modeling.py         # updates topic assignments in the database
 
 - `research_server.py`: The core MCP server — defines every tool listed above.
 - `index.py`: Vercel entrypoint — exposes the same server over Streamable HTTP.
-- `db.py`: Postgres access (schema, upsert, fetch, topic updates).
-- `auth.py`: Bearer-token gate for the hosted deployment.
-- `llm.py`: Claude Haiku 4.5 calls (structured-output extraction + topic labeling).
+- `db.py`: Postgres access (schema, upsert, fetch, topic updates, literature review cache).
+- `oauth_provider.py`: Minimal single-user OAuth authorization server for the hosted deployment (dynamic client registration + a login form gated by `MCP_AUTH_TOKEN`).
+- `dashboard.py`: The web dashboard's routes, templates, and its own login-cookie gate (also keyed by `MCP_AUTH_TOKEN`, separate from the OAuth flow above).
+- `llm.py`: Claude Haiku 4.5 calls (structured-output extraction, topic labeling, literature review generation).
 - `analyze_references.py`: Keyword-frequency visualization (also the `visualize_keyword_trends` tool).
+- `research_trends.py`: Topic-over-time analysis (also the `visualize_research_trends` tool).
 - `generate_network.py`: NetworkX/Pyvis co-authorship graph (also the `generate_author_network` tool).
 - `topic_modeling.py`: Scikit-learn NMF topic modeling (also the `discover_research_topics` tool).
 - `requirements.txt`: Python dependencies.

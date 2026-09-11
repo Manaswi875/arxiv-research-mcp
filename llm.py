@@ -53,3 +53,41 @@ def label_topics(topic_summaries: dict) -> dict:
         output_format=TopicLabels,
     )
     return {entry.topic_id: entry.label for entry in response.parsed_output.labels}
+
+
+def generate_literature_review(papers: list[dict]) -> str:
+    """One call synthesizes the whole bibliography into a narrative review.
+
+    Deliberately does NOT use output_format=Pydantic like the two functions above -
+    that's right for discrete fields, but forcing multi-paragraph prose through strict
+    JSON-string escaping adds risk for zero benefit here. Plain text generation instead.
+    """
+    if not papers:
+        raise ValueError("The bibliography is empty. Save some papers first with save_to_bibliography.")
+
+    numbered = []
+    for i, p in enumerate(papers, start=1):
+        published = p.get("published")
+        year = published.year if hasattr(published, "year") else "n.d."
+        numbered.append(
+            f'[{i}] "{p.get("title", "")}" ({year})\n'
+            f'    Problem: {p.get("problem") or "N/A"}\n'
+            f'    Method: {p.get("method") or "N/A"}\n'
+            f'    Result: {p.get("result") or "N/A"}'
+        )
+
+    prompt = (
+        "You are writing a literature review section for a research paper, synthesizing the "
+        f"following {len(papers)} papers. Write a cohesive narrative (not a list) that groups "
+        "related papers thematically, compares their methods and findings, and highlights trends "
+        "or gaps. Cite every paper using its bracketed number exactly as given, e.g. [3], inline "
+        "in the text - never invent a number, never omit a citation when referencing a specific "
+        "paper's claim. End with a 'References' section listing every number with its title and "
+        "year.\n\nPapers:\n\n" + "\n\n".join(numbered)
+    )
+    response = _client.messages.create(
+        model=MODEL,
+        max_tokens=8192,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return response.content[0].text

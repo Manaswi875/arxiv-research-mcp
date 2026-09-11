@@ -12,11 +12,14 @@ from starlette.exceptions import HTTPException
 from starlette.requests import Request
 from starlette.responses import Response
 
+import dashboard
 import db
 from analyze_references import analyze
 from generate_network import generate_graph
 from llm import extract_findings_llm, label_topics
+from llm import generate_literature_review as generate_literature_review_llm
 from oauth_provider import MCP_SCOPE, SimpleOAuthProvider
+from research_trends import analyze_trends
 from topic_modeling import run_topic_modeling
 
 # Initialize FastMCP server.
@@ -227,6 +230,25 @@ def visualize_keyword_trends() -> list:
     return blocks
 
 @mcp.tool()
+def visualize_research_trends() -> list:
+    """
+    Analyze how the bibliography's research topics have shifted over time (papers per
+    topic per year), using the topic labels from discover_research_topics.
+
+    Returns:
+        A JSON text block with 'papers_analyzed', 'years', and 'topics' (each with
+        'topic_label' and 'counts_by_year') - or an 'error' message if there's no
+        bibliography yet, or no saved paper has a publish date - followed by a stacked
+        bar chart as an inline image.
+    """
+    result = analyze_trends()
+    png_bytes = result.pop("chart_png", None)
+    blocks: list = [json.dumps(result, indent=2)]
+    if png_bytes:
+        blocks.append(Image(data=png_bytes, format="png"))
+    return blocks
+
+@mcp.tool()
 def generate_author_network() -> str:
     """
     Build an interactive co-authorship network graph from the bibliography.
@@ -242,11 +264,25 @@ def generate_author_network() -> str:
         result["html_base64"] = base64.b64encode(html.encode("utf-8")).decode("ascii")
     return json.dumps(result, indent=2)
 
+def _recompute_topics(num_topics: int = 5) -> dict:
+    """Shared by the discover_research_topics tool and the dashboard's "Recompute
+    Topics" button - one code path, so the two surfaces can never drift apart."""
+    result = run_topic_modeling(num_topics=num_topics)
+    if "error" not in result:
+        try:
+            labels = label_topics(result["topic_summaries"])
+            db.update_topic_labels_bulk({int(k): v for k, v in labels.items()})
+            result["topic_labels"] = labels
+        except Exception as e:
+            result["topic_labels_error"] = str(e)
+    return result
+
 @mcp.tool()
 def discover_research_topics(num_topics: int = 5) -> str:
     """
     Run NMF topic modeling over the bibliography to automatically discover hidden research
-    themes, and save the per-paper topic assignments back to the database.
+    themes, and save the per-paper topic assignments (including readable labels) back to
+    the database.
 
     Args:
         num_topics: Number of topics to discover (default 5). Must be <= number of saved papers.
@@ -256,13 +292,32 @@ def discover_research_topics(num_topics: int = 5) -> str:
         (short human-readable label per topic, from a single batched Claude Haiku call),
         'topic_distribution' (paper count per topic), or an 'error' message.
     """
-    result = run_topic_modeling(num_topics=num_topics)
-    if "error" not in result:
-        try:
-            result["topic_labels"] = label_topics(result["topic_summaries"])
-        except Exception as e:
-            result["topic_labels_error"] = str(e)
-    return json.dumps(result, indent=2)
+    return json.dumps(_recompute_topics(num_topics), indent=2)
+
+
+def _generate_and_save_review() -> str:
+    """Shared by the generate_literature_review tool and the dashboard's button."""
+    papers = db.fetch_all_papers()
+    review = generate_literature_review_llm(papers)
+    db.save_literature_review(review, len(papers))
+    return review
+
+@mcp.tool()
+def generate_literature_review() -> str:
+    """
+    Synthesize the whole bibliography into one narrative literature review with numbered
+    [n] citations (matching the paper's position in the bibliography) and a References
+    section, via a single batched Claude Haiku call - not one call per paper.
+
+    Returns:
+        The generated review text, or a JSON string with an 'error' message.
+    """
+    try:
+        return _generate_and_save_review()
+    except Exception as e:
+        return json.dumps({"error": f"Literature review generation failed: {str(e)}"})
+
+dashboard.register_dashboard_routes(mcp, generate_review_fn=_generate_and_save_review, recompute_topics_fn=_recompute_topics)
 
 if __name__ == "__main__":
     # Initialize and run the server

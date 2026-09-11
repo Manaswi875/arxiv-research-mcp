@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timezone
 
 import psycopg
 from psycopg.rows import dict_row
@@ -89,6 +90,32 @@ def update_topics(paper_id: int, topic_id: int, topic_keywords: str, topic_label
             "UPDATE papers SET topic_id = %s, topic_keywords = %s, topic_label = %s WHERE id = %s;",
             (topic_id, topic_keywords, topic_label, paper_id),
         )
+
+
+def update_topic_labels_bulk(labels: dict[int, str]) -> None:
+    """Persist the human-readable label for each topic_id (labels is topic_id -> label)."""
+    with get_connection() as conn, conn.cursor() as cur:
+        for topic_id, label in labels.items():
+            cur.execute(
+                "UPDATE papers SET topic_label = %s WHERE topic_id = %s;",
+                (label, topic_id),
+            )
+
+
+def save_literature_review(content: str, paper_count: int) -> None:
+    oauth_set(
+        "literature_review",
+        "latest",
+        {
+            "content": content,
+            "paper_count": paper_count,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+        },
+    )
+
+
+def get_latest_literature_review() -> dict | None:
+    return oauth_get("literature_review", "latest")
 
 
 def oauth_set(kind: str, key: str, value: dict, ttl_seconds: int | None = None) -> None:
