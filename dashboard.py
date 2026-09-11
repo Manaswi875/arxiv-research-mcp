@@ -18,7 +18,9 @@ import hashlib
 import hmac
 import os
 import time
+import traceback
 from collections import Counter
+from urllib.parse import quote
 
 from jinja2 import DictLoader, Environment, select_autoescape
 from starlette.requests import Request
@@ -88,6 +90,12 @@ DASHBOARD_TEMPLATE = """
   <h1>🎓 ArXiv Research Assistant</h1>
   <a href="/dashboard/logout">Sign out</a>
 </div>
+
+{% if error %}
+<div class="card" style="border-left: 4px solid #dc2626; background: #fef2f2;">
+  <strong style="color: #dc2626;">Error:</strong> {{ error }}
+</div>
+{% endif %}
 
 <div class="card">
   <h2>Bibliography ({{ papers|length }} papers)</h2>
@@ -212,7 +220,10 @@ def register_dashboard_routes(mcp, generate_review_fn, recompute_topics_fn) -> N
         review = db.get_latest_literature_review()
         topic_counts = Counter(p.get("topic_label") or "Uncategorized" for p in papers if p.get("topic_id") is not None)
         template = _env.get_template("dashboard.html")
-        return HTMLResponse(template.render(papers=papers, review=review, topic_counts=topic_counts.most_common()))
+        return HTMLResponse(template.render(
+            papers=papers, review=review, topic_counts=topic_counts.most_common(),
+            error=request.query_params.get("error"),
+        ))
 
     @mcp.custom_route("/dashboard/login", methods=["GET"])
     async def login_page(request: Request) -> Response:
@@ -281,7 +292,16 @@ def register_dashboard_routes(mcp, generate_review_fn, recompute_topics_fn) -> N
         redirect = _require_session(request)
         if redirect:
             return redirect
-        recompute_topics_fn()
+        try:
+            result = recompute_topics_fn()
+            if result.get("topic_labels_error"):
+                return RedirectResponse(
+                    url=f"/?error={quote(f'Topics computed, but labeling failed: ' + result['topic_labels_error'][:250])}",
+                    status_code=303,
+                )
+        except Exception as e:
+            traceback.print_exc()  # visible in Vercel function logs
+            return RedirectResponse(url=f"/?error={quote(f'Recompute topics failed: {e}'[:300])}", status_code=303)
         return RedirectResponse(url="/", status_code=303)
 
     @mcp.custom_route("/dashboard/api/literature-review", methods=["POST"])
@@ -289,5 +309,9 @@ def register_dashboard_routes(mcp, generate_review_fn, recompute_topics_fn) -> N
         redirect = _require_session(request)
         if redirect:
             return redirect
-        generate_review_fn()
+        try:
+            generate_review_fn()
+        except Exception as e:
+            traceback.print_exc()  # visible in Vercel function logs
+            return RedirectResponse(url=f"/?error={quote(f'Literature review failed: {e}'[:300])}", status_code=303)
         return RedirectResponse(url="/", status_code=303)
