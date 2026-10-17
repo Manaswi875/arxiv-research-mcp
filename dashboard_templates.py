@@ -83,21 +83,21 @@ LOGIN_TEMPLATE = """
 <div style="display: flex; align-items: center; justify-content: center; min-height: 100vh;">
   <div class="card" style="max-width: 400px; width: 100%;">
     <h2>🎓 ArXiv Research Assistant</h2>
-    <p class="muted">Enter the access token to view the dashboard.</p>
-    <form method="post" action="/dashboard/login">
-      <input type="hidden" name="next" value="{{ next }}">
-      <div class="field">
-        <input type="password" name="token" placeholder="Access token" required autofocus>
-      </div>
-      <button class="btn" style="width: 100%;" type="submit">Sign in</button>
+    <p class="muted">An MCP server that searches arXiv, extracts key findings, discovers research topics, and writes literature reviews with Claude.</p>
+    <form method="post" action="/dashboard/demo">
+      <button class="btn" style="width: 100%;" type="submit">Explore the live demo</button>
     </form>
-    {% if error %}<p style="color: #dc2626; margin-top: 12px;">{{ error }}</p>{% endif %}
-    <div style="border-top: 1px solid var(--border); margin-top: 20px; padding-top: 18px;">
-      <p class="muted" style="margin-top: 0;">Just looking around? Explore a live, read-only demo - no token needed.</p>
-      <form method="post" action="/dashboard/demo">
-        <button class="btn btn-secondary" style="width: 100%;" type="submit">Explore the demo</button>
+    <details style="border-top: 1px solid var(--border); margin-top: 20px; padding-top: 14px;"{% if error %} open{% endif %}>
+      <summary class="muted" style="cursor: pointer;">Owner sign-in</summary>
+      <form method="post" action="/dashboard/login" style="margin-top: 12px;">
+        <input type="hidden" name="next" value="{{ next }}">
+        <div class="field">
+          <input type="password" name="token" placeholder="Access token" required>
+        </div>
+        <button class="btn btn-secondary" style="width: 100%;" type="submit">Sign in</button>
       </form>
-    </div>
+      {% if error %}<p style="color: #dc2626; margin-top: 12px;">{{ error }}</p>{% endif %}
+    </details>
   </div>
 </div>
 {% endblock %}
