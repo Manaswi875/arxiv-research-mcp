@@ -29,7 +29,7 @@ from datetime import date
 from urllib.parse import quote, urlparse
 
 from starlette.requests import Request
-from starlette.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
+from starlette.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 
 from analyze_references import analyze
 from dashboard_templates import env
@@ -204,8 +204,12 @@ def register_dashboard_routes(mcp, generate_review_fn, recompute_topics_fn) -> N
         if review:
             review_status = (review.get("generated_at") or "")[:10] or "Draft"
         recent_papers = list(reversed(papers[-5:]))
+        years = sorted(p["published"].year for p in papers if p.get("published"))
+        year_span = "—" if not years else (str(years[0]) if years[0] == years[-1] else f"{years[0]}–{years[-1]}")
+        author_count = len({a for p in papers for a in (p.get("authors") or [])})
         return HTMLResponse(_render(request, "overview.html",
             active="overview", paper_count=len(papers), topic_count=topic_count,
+            author_count=author_count, year_span=year_span,
             review_status=review_status, recent_papers=recent_papers,
             error=request.query_params.get("error"), ok=request.query_params.get("ok"),
         ))
@@ -417,6 +421,32 @@ def register_dashboard_routes(mcp, generate_review_fn, recompute_topics_fn) -> N
         return _redirect("/dashboard/review", ok="Review regenerated.")
 
     # --- Chart image endpoints (shared by Overview) ---
+
+    @mcp.custom_route("/dashboard/api/charts.json", methods=["GET"])
+    async def charts_data(request: Request) -> Response:
+        """Raw data behind the Overview's interactive charts (the PNG endpoints
+        below remain for the MCP tools' inline images)."""
+        redirect = _require_session(request)
+        if redirect:
+            return redirect
+        keywords = analyze()
+        keywords.pop("chart_png", None)
+        trends = analyze_trends()
+        trends.pop("chart_png", None)
+        counts: dict[str, int] = {}
+        for p in db.fetch_all_papers():
+            if p.get("topic_id") is not None:
+                label = p.get("topic_label") or f"Topic {p['topic_id']}"
+                counts[label] = counts.get(label, 0) + 1
+        return JSONResponse({
+            "keywords": {
+                "error": keywords.get("error"),
+                "method": keywords.get("method_keywords") or [],
+                "problem": keywords.get("problem_keywords") or [],
+            },
+            "trends": {"error": trends.get("error"), "years": trends.get("years") or [], "topics": trends.get("topics") or []},
+            "topic_share": [{"label": k, "count": v} for k, v in sorted(counts.items(), key=lambda kv: -kv[1])],
+        })
 
     @mcp.custom_route("/dashboard/api/keyword-chart.png", methods=["GET"])
     async def keyword_chart(request: Request) -> Response:
