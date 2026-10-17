@@ -1,6 +1,26 @@
-# 🎓 ArXiv Research Assistant (MCP Server)
+# 🎓 ArXiv Research Assistant
 
-A Research Agent server built with the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/). Search ArXiv, extract structured findings from papers, build a bibliography, and discover insights (keyword trends, topic clusters, a research timeline, an AI-written literature review) — all as tools an AI assistant can call directly, plus a full multi-page web dashboard with editing built in. Runs either as a local server launched by your IDE, or hosted remotely.
+**An NLP research assistant for arXiv, built as an MCP server.** Search papers, extract structured findings with an LLM, discover hidden research themes with NMF topic modeling, track how topics shift over time, and generate a cited literature review.
+
+[![Live demo](https://img.shields.io/badge/🔗_Live_demo-arxiv--research--mcp.vercel.app-2a78d6?style=for-the-badge)](https://arxiv-research-mcp.vercel.app)
+
+![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white) ![scikit-learn](https://img.shields.io/badge/scikit--learn-F7931E?logo=scikitlearn&logoColor=white) ![pandas](https://img.shields.io/badge/pandas-150458?logo=pandas&logoColor=white) ![Claude API](https://img.shields.io/badge/Claude_API-D97757?logo=anthropic&logoColor=white) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white) ![MCP](https://img.shields.io/badge/MCP-000000) ![Vercel](https://img.shields.io/badge/Vercel-000000?logo=vercel&logoColor=white)
+
+![Dashboard](docs/dashboard.png)
+
+> Click **Explore the live demo** on the site to browse a read-only copy of the dashboard. No sign-up needed.
+
+## 🔬 The data science behind it
+
+| Step | Technique |
+|---|---|
+| Findings extraction | LLM structured output (Claude Haiku → Pydantic schema) for Problem / Method / Result, with a free keyword-heuristic baseline |
+| Topic discovery | TF-IDF vectorization + **NMF** (non-negative matrix factorization), with the keyword clusters labeled by one batched LLM call |
+| Trend analysis | Papers per topic per year (pandas pivot), shown as interactive stacked bar / line charts |
+| Keyword analysis | Term frequency across extracted methods and problems |
+| Synthesis | One LLM call writes a thematic literature review with numbered citations checked against the bibliography |
+
+The public demo is cost-capped: per-IP and global daily limits on the LLM actions, counted atomically in Postgres, fall back to saved results when a limit is hit or the API credit runs out.
 
 ## 🚀 Features
 
@@ -12,7 +32,7 @@ A Research Agent server built with the [Model Context Protocol (MCP)](https://mo
     *   Research Timeline: stacked bar chart of how your saved papers' topics have shifted year over year.
     *   Topic Modeling: NMF (Non-Negative Matrix Factorization) discovers hidden research themes, then a single Claude Haiku call turns the raw keyword clusters into short readable labels — labels can also be renamed manually at any time.
     *   Literature Review: one Claude Haiku call synthesizes the whole bibliography into a cohesive, numbered-citation narrative review — editable directly, or regenerated from scratch.
-*   Web Dashboard: a real multi-page site (Overview / Papers / Topics / Review) at the deployed root URL, gated behind a login page — not open to the whole internet.
+*   Web Dashboard: a multi-page site (Overview / Papers / Topics / Review) with interactive charts. Editing is behind an owner login; visitors get a read-only, rate-limited demo mode.
 
 ## Installation
 
