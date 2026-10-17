@@ -57,6 +57,7 @@ BASE_TEMPLATE = """
   .field { margin-bottom: 16px; }
   .banner { border-radius: 10px; padding: 14px 18px; margin-bottom: 20px; font-size: 14px; }
   .banner-error { background: #fdeceb; border-left: 4px solid var(--danger); color: #9c1f1e; }
+  .banner-info { background: #eaf2fc; border-left: 4px solid var(--primary); color: #1d4f8f; }
   .banner-ok { background: #e9f7ef; border-left: 4px solid #1baf7a; color: #106b45; }
   .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
   .badge-edited { background: #fff3d6; color: #8a6100; }
@@ -91,6 +92,12 @@ LOGIN_TEMPLATE = """
       <button class="btn" style="width: 100%;" type="submit">Sign in</button>
     </form>
     {% if error %}<p style="color: #dc2626; margin-top: 12px;">{{ error }}</p>{% endif %}
+    <div style="border-top: 1px solid var(--border); margin-top: 20px; padding-top: 18px;">
+      <p class="muted" style="margin-top: 0;">Just looking around? Explore a live, read-only demo - no token needed.</p>
+      <form method="post" action="/dashboard/demo">
+        <button class="btn btn-secondary" style="width: 100%;" type="submit">Explore the demo</button>
+      </form>
+    </div>
   </div>
 </div>
 {% endblock %}
@@ -110,7 +117,9 @@ SHELL_TEMPLATE = """
     </div>
   </nav>
   <main style="flex: 1; padding: 32px 40px; max-width: 1100px;">
+    {% if is_guest %}<div class="banner banner-info"><strong>Demo mode:</strong> browse freely - editing is disabled, and the AI buttons (Recompute Topics, Regenerate Review) have a small daily limit.</div>{% endif %}
     {% if error %}<div class="banner banner-error"><strong>Error:</strong> {{ error }}</div>{% endif %}
+    {% if info %}<div class="banner banner-info">{{ info }}</div>{% endif %}
     {% if ok %}<div class="banner banner-ok">{{ ok }}</div>{% endif %}
     {% block page %}{% endblock %}
   </main>

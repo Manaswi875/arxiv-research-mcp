@@ -206,6 +206,26 @@ def oauth_get(kind: str, key: str) -> dict | None:
         return row["value"] if row else None
 
 
+def usage_try_increment(conn: psycopg.Connection, key: str, amount: int, limit: int) -> bool:
+    """Add `amount` to the counter at `key` only if the result stays <= `limit`.
+    Single statement, so concurrent requests can't both slip past the cap.
+    Takes the caller's connection so demo_limits can wrap two of these in one transaction."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO oauth_store (kind, key, value, expires_at)
+            SELECT 'usage', %(key)s, jsonb_build_object('n', %(amount)s), now() + interval '2 days'
+            WHERE %(amount)s <= %(limit)s
+            ON CONFLICT (kind, key) DO UPDATE
+                SET value = jsonb_build_object('n', (oauth_store.value->>'n')::int + %(amount)s)
+                WHERE (oauth_store.value->>'n')::int + %(amount)s <= %(limit)s
+            RETURNING 1;
+            """,
+            {"key": key, "amount": amount, "limit": limit},
+        )
+        return cur.fetchone() is not None
+
+
 def oauth_delete(kind: str, key: str) -> None:
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute("DELETE FROM oauth_store WHERE kind = %s AND key = %s;", (kind, key))
