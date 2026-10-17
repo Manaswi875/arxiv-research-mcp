@@ -128,17 +128,10 @@ LOGIN_TEMPLATE = """
   .hero h1 { font-size: clamp(36px, 6vw, 62px); line-height: 1.04; font-weight: 800; letter-spacing: -0.045em; margin-bottom: 18px; }
   .grad-text { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
   .hero .lead { font-size: 18px; color: var(--text-2); line-height: 1.6; max-width: 590px; margin: 0 auto 32px; }
-  .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); gap: 12px; margin: 46px 0 34px; text-align: left; }
-  .feature { padding: 18px; border-radius: 16px; background: var(--card); backdrop-filter: blur(14px); border: 1px solid var(--border); box-shadow: var(--shadow); transition: transform .2s, box-shadow .2s, border-color .2s; }
-  .feature:hover { transform: translateY(-3px); border-color: #c9dcf5; box-shadow: 0 16px 32px -16px rgba(42,120,214,0.35); }
-  .feature .ico { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: #eef4fd; font-size: 17px; margin-bottom: 12px; }
-  .feature .t { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
-  .feature .d { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
   .owner { max-width: 380px; margin: 0 auto; }
   .owner summary { list-style: none; cursor: pointer; color: var(--muted); font-size: 13px; }
   .owner summary::-webkit-details-marker { display: none; }
   .owner summary:hover { color: var(--text); }
-  .stack { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 18px; }
 </style>
 <div class="hero">
   <div class="hero-inner">
@@ -148,16 +141,7 @@ LOGIN_TEMPLATE = """
     <form method="post" action="/dashboard/demo">
       <button class="btn btn-lg" type="submit">Explore the live demo &rarr;</button>
     </form>
-    <div class="stack">
-      <span class="chip">Python</span><span class="chip">MCP</span><span class="chip">Claude API</span><span class="chip">Postgres</span><span class="chip">scikit-learn</span><span class="chip">Vercel</span>
-    </div>
-    <div class="features">
-      <div class="feature"><div class="ico">🔎</div><div class="t">arXiv search</div><div class="d">Query papers by topic, straight from your AI client.</div></div>
-      <div class="feature"><div class="ico">🧠</div><div class="t">Key findings</div><div class="d">Problem, method, and result extracted by Claude.</div></div>
-      <div class="feature"><div class="ico">🧭</div><div class="t">Topic discovery</div><div class="d">NMF topic modeling with AI-written labels.</div></div>
-      <div class="feature"><div class="ico">📝</div><div class="t">Literature review</div><div class="d">A cited narrative synthesis of your bibliography.</div></div>
-    </div>
-    <details class="owner"{% if error %} open{% endif %}>
+    <details class="owner" style="margin-top: 36px;"{% if error %} open{% endif %}>
       <summary>Owner sign-in</summary>
       <form method="post" action="/dashboard/login" style="margin-top: 14px; display: flex; gap: 8px;">
         <input type="hidden" name="next" value="{{ next }}">
